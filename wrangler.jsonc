@@ -2,7 +2,6 @@
   "name": "blog-fuwari",
   "compatibility_date": "2025-11-24", // Update to the day you deploy
   "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS"
+    "directory": "./dist"
   }
 }
