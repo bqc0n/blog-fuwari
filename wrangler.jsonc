@@ -1,5 +1,8 @@
 {
   "name": "blog-fuwari",
   "compatibility_date": "2025-11-24", // Update to the day you deploy
-  "pages_build_output_dir": "./dist"
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  }
 }
