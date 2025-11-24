@@ -16,13 +16,13 @@ Mixinで`NarratorDummy`を返すようにOverwriteする。
 :::
 
 :::note[注意]
-- 足りないネイティブライブラリを追加するというような、根本的な解決ではないです。
-- Mixinを使用できる環境であることが前提です。
+- 足りないネイティブライブラリを追加するというような、根本的な解決ではない
+- Mixinを使用できる環境であることが前提
 :::
 
 # これは何
 
-Apple Siliconを搭載したMac (つまりCPUアーキテクチャがarm64)で、Minecraft 1.12.2に向けたModdingをしている際、
+Apple Siliconを搭載したMacで、Minecraft 1.12.2に向けたModdingをしている際、
 JDKにarm64ネイティブなもの(例えばAzul Zulu Community)を使用すると、ゲーム起動時に`UnsatisfiedLinkError`が出てクラッシュした。
 
 調べると、`NarratorOSX`が読み込まれることで発生しているので、Mixinを使って強引に回避した。
@@ -180,6 +180,18 @@ VBOs are available because OpenGL 1.5 is supported.
 
 </details>
 
+## 扱うもの
+
+- UnsatisfiedLinkErrorの原因
+- InterfaceのStatic MethodへのOverwrite Mixin
+- Early Mixinに関する設定
+- Mixin Plugin
+
+## 扱わないもの
+
+- Mixin基礎事項
+  - 一度`ILateMixinLoader`を通じてMixinを利用したことがある前提
+
 ## より詳しい経緯
 
 ある日、いつも通りに1.12.2でModdingしていると、RetroFuturaGradleがこう言ってきた:
@@ -204,6 +216,7 @@ at com.mojang.text2speech.Narrator.getNarrator(Narrator.java:22)
 ```
 
 `Narrator.getNarrator()`を見ると、OSに対応する`Narrator`インスタンスを生成している。
+MacOSの場合は`NarratorOSX`が返される。このクラスが存在しないネイティブライブラリを読み込もうとしてクラッシュしている。
 
 ```java
 static Narrator getNarrator() {
@@ -223,7 +236,7 @@ static Narrator getNarrator() {
 }
 ```
 
-ナレーターは使っていないので、`getNarrator()`が単に`new NarratorDummy()`を返すようにすれば良さそう。
+ナレーターは使っていないので、`getNarrator()`が単に`new NarratorDummy()`を返すようにMixinすれば良さそう。
 
 # 解決策
 
@@ -231,12 +244,7 @@ static Narrator getNarrator() {
 
 ## Mixinの作成
 
-Mixinクラスを作る。
-Mixinの注意点として、通常のModのクラスとは別パッケージに配置しなければならない。`com.example.mixins`のような感じでいいと思う。
-また、通常のModにKotlinやScalaを利用している場合でもJavaを使う必要がある。
-
-Interfaceのstaticメソッドという少し特殊なケースだからなのか、Injectだと動かなかった。
-なのでOverwriteする。
+Interfaceのstaticメソッドという少し特殊なケースだからなのか、Injectだと動かなかったので、Overwriteする。
 
 ```java
 package com.example.mixins;
@@ -260,6 +268,8 @@ public interface MixinNarrator {
 }
 ```
 
+## @reasonタグの追加
+
 ここで問題が発生した。
 OverwriteするならJavadocに`@reason`タグを追加せよと怒られたのだが、追加するとそんなタグはないと怒られてしまう。
 このままだと`javadoc`タスクが通らない。
@@ -273,37 +283,32 @@ tasks.withType<Javadoc> {
 
 ## Early Mixinの概要
 
-Mixinは作っただけでは動かず、読み込ませるための設定が必要である。
-必要なのは以下の2つ:
-- jsonファイル: どのパッケージにMixinが置かれているのかと言った情報を設定する
-- Mixin Loaderクラス: 上のjsonファイルのファイル名を指定する
-
-Mixin Loaderには`ILateMixinLoader`と`IEarlyMixinLoader`の2種類がある。
-使い分けについては[MixinBooterのリポジトリ](https://github.com/CleanroomMC/MixinBooter)に書いてあり、今回のようにバニラにMixinする場合は`IEarlyMixinLoader`を使う。
-
-> - Mixin into minecraft, forge or coremods? Make a coremod with IFMLLoadingPlugin and implement the class with IEarlyMixinLoader
-> - Mixin into normal mods? Make a normal class anywhere in your mod file, implement the class with ILateMixinLoader
-
+バニラやforgeへのMixinには`IEarlyMixinLoader`を使う[^1]。
 注意点として、`IEarlyMixinLoader`を実装するクラスは`FMLLoadingPlugin`も実装する必要がある。
 つまりCoreMod化が必要である。
 
+[^1]: MixinBooterのREADMEを参照: https://github.com/CleanroomMC/MixinBooter
+
 ## CoreMod設定
 
-CoreModを作る場合、コードだけではなく`META-INF/MANIFEST.MF`もいじる必要がある。
+CoreMod化の手順は環境によって異なる。
 
-しかし、[CleanroomMC/ForgeDevEnv](https://github.com/CleanroomMC/ForgeDevEnv/)のようなモダンな1.12.2開発環境では、`MANIFEST.MF`は自動生成されるようになっている。
+まず前提として、CoreModを作る場合、コードだけではなく`META-INF/MANIFEST.MF`もいじる必要がある。
+
+しかし、[CleanroomMC/ForgeDevEnv](https://github.com/CleanroomMC/ForgeDevEnv/)のようなモダンな1.12.2開発環境では、MANIFEST.MFは自動生成されるようになっている。
 実際このテンプレートでは`gradle.properties`にCoreMod関連のパラメータが[予め用意されている](https://github.com/CleanroomMC/ForgeDevEnv/blob/782ad1bef9c6b74e188712d556283e0b3fb935c0/gradle.properties#L113-L120)。
 
-もしそう言ったテンプレートを使っていないなら、[Minecraft Modding Wiki](https://mcmodding.jp/modding/index.php/Coremods%E3%81%AE%E5%9F%BA%E7%A4%8E)が参考になると思う。
+もしそう言ったテンプレートを使っていないなら、手でMANIFEST.MFを書く必要がある。
+[Minecraft Modding Wiki](https://mcmodding.jp/modding/index.php/Coremods%E3%81%AE%E5%9F%BA%E7%A4%8E)が参考になると思う。
 
-ハマりポイントとして、`FMLCorePluginContainsFMLMod: *`のような記述を`MANIFEST.MF`に追加しないと通常のMod部分が読まれない。
+ハマりポイントとして、`FMLCorePluginContainsFMLMod: *`のような記述をMANIFEST.MFに追加しないと通常のMod部分が読まれない。
 つまり`@Mod`アノテーションが付けられたクラスが読み込まれず、CoreMod部分しか動かない。
 テンプレートだと`coremod_includes_mod = true`で表現されている。
 
 ## IEarlyMixinLoaderの実装
 
 今回はMixinを使いたいだけなので、CoreModに関する部分はnullや空配列を返す。
-重要なのは一番下の`getMixinConfigs()`メソッドで、ここでMixinの設定が書かれたjsonファイルの名前を返す。
+それ以外は`ILateMixinLoader`と同じ。
 
 ```java {27-30}
 @IFMLLoadingPlugin.Name("Example-Core")
@@ -339,37 +344,15 @@ public class ExampleCoremod implements IFMLLoadingPlugin, IEarlyMixinLoader {
 }
 ```
 
-## Mixin設定jsonファイルの作成
-
-`mixins.core.example.json`を作る。
-これは`resources/`以下に置く。
-
-`mixins`配列に読み込ませたいMixinを指定する。
-パッケージのネストがある場合も素直に`nested.MixinClass`のように指定すればOK。
-
-```json title="mixins.core.example.json"
-{
-  "package": "com.example.mixins",
-  "refmap": "mixins.example.refmap.json",
-  "target": "@env(DEFAULT)",
-  "minVersion": "0.8",
-  "compatibilityLevel": "JAVA_8",
-  "mixins": [
-    "MixinNarrator"
-  ],
-  "client": [],
-  "server": []
-}
-```
-
 ここまできたら、クラッシュ問題は解決しているはず。
+
 ただしこのままだと、開発環境にとどまらず実環境(obf環境)でもMixinが適用されてしまう。
 これは避けたいので、`IMixinConfigPlugin`を実装して適用する。
 
 ## IMixinConfigPluginの実装
 
-適当な場所に`MixinConfigPlugin`を実装したクラスを作る。
-このクラスにも`getMixins`があるが、これはjsonファイルに書かれた以外のMixinを追加したいときに使うものなので、今回はnullでOK。
+`IMixinConfigPlugin`を実装する。
+このインターフェースにも`getMixins`があるが、これはmixin config jsonに書かれた以外のMixinを追加したいときに使うものなので、今回はnullでOK。
 
 重要なのは`shouldApplyMixin`メソッドで、ここでMixinを適用するかどうかを決定できる。
 Mixinクラス名が`Narrator`で終わり、かつ開発環境でない場合にはfalseを返してMixinが適用されないようにする。
