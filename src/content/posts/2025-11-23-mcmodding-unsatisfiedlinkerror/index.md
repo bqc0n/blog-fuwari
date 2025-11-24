@@ -1,6 +1,6 @@
 ---
 title: "Minecraft Modding: Apple Silicon Mac での UnsatisfiedLinkError を強引に解決する"
-published: 2025-11-20
+published: 2025-11-23
 description: 'Apple Silicon Macで古いMinecraftバージョン(1.12.2)向けのModdingをする際、arm64ネイティブなJDKを使うと発生する UnsatisfiedLinkError を、Mixinで強引に解決する'
 image: ''
 tags: ["Coding", "Minecraft", "Minecraft Modding"]
@@ -10,7 +10,9 @@ lang: ''
 ---
 
 :::note[TL;DR]
-`com.mojang.text2speech.Narrator#getNarrator`が`NarratorOSX`を返すのを阻止するため、
+- Apple Silicon Macで1.12.2 Mod開発をしている場合、Rosetta 2経由でx86_64 JDKを使っているかもしれない
+- ただArm64ネイティブなJDKを使うと、`com.mojang.text2speech.NarratorOSX`が読み込まれた際に`UnsatisfiedLinkError`が発生してクラッシュする
+- `com.mojang.text2speech.Narrator#getNarrator`が`NarratorOSX`を返すのを阻止するため、
 Mixinで`NarratorDummy`を返すようにOverwriteする。
 バニラへのMixinなので、`IEarlyMixinLoader`を使う。
 :::
