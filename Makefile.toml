@@ -1,0 +1,7 @@
+[config]
+skip_core_tasks = true
+
+[tasks]
+up = { command = "docker", args = ["compose", "up", "dev", "--build"] }
+stop = { command = "docker", args = ["compose", "down"] }
+clean = { dependencies = ["stop"], command = "docker", args = ["volume", "rm", "blog-fuwari_vitepress-node-modules"], ignore_errors = true }
